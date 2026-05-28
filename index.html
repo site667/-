@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>МедПомощник | Здоровье, аптеки, напоминания</title>
+    <!-- Подключаем Leaflet для карты -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* 🌿 Базовые переменные (светлая тема по умолчанию - зелено-голубая) */
+        :root {
+            --bg-gradient-start: #d4f3f0;
+            --bg-gradient-end: #b8e1dc;
+            --app-bg: #f5fefc;
+            --card-bg: #e0f3ef;
+            --primary-dark: #2c7a6e;
+            --primary-light: #4bb8a6;
+            --text-dark: #1d4e44;
+            --border-light: #bbddd5;
+            --btn-shadow: rgba(28, 92, 80, 0.25);
+            --delete-bg: #ffa098;
+            --delete-color: #702c1c;
+            --top-bar-text: white;
+        }
+
+        body.dark {
+            --bg-gradient-start: #1a2f2b;
+            --bg-gradient-end: #0e2b25;
+            --app-bg: #1e2e2a;
+            --card-bg: #2a403b;
+            --primary-dark: #3d9b8a;
+            --primary-light: #5fcbbc;
+            --text-dark: #d4f3ef;
+            --border-light: #3c6b61;
+            --btn-shadow: rgba(0, 0, 0, 0.4);
+            --delete-bg: #a55345;
+            --delete-color: #ffc2b3;
+            --top-bar-text: #eef7f4;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Roboto', system-ui, sans-serif;
+            background: linear-gradient(145deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 500px;
+            height: 90vh;
+            min-height: 650px;
+            background: var(--app-bg);
+            border-radius: 48px 48px 32px 32px;
+            box-shadow: 0 25px 45px rgba(0, 40, 30, 0.25);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: background 0.2s;
+        }
+
+        .top-bar {
+            background: var(--primary-dark);
+            padding: 18px 20px 14px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: var(--top-bar-text);
+            transition: background 0.2s;
+        }
+
+        .back-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            font-size: 1.4rem;
+            width: 40px;
+            height: 40px;
+            border-radius: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: white;
+        }
+
+        .settings-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            font-size: 1.3rem;
+            width: 40px;
+            height: 40px;
+            border-radius: 30px;
+            cursor: pointer;
+            color: white;
+            margin-left: auto;
+        }
+
+        .page-title {
+            font-size: 1.4rem;
+            font-weight: 600;
+            flex: 1;
+        }
+
+        .page-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            scroll-behavior: smooth;
+        }
+
+        /* Главное меню */
+        .menu-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .menu-btn {
+            background: linear-gradient(115deg, var(--primary-dark), var(--primary-light));
+            border: none;
+            padding: 16px;
+            border-radius: 60px;
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: white;
+            cursor: pointer;
+            text-align: center;
+            transition: 0.2s;
+            box-shadow: 0 6px 14px var(--btn-shadow);
+        }
+
+        /* Общие карточки */
+        .card-item {
+            background: var(--card-bg);
+            border-radius: 24px;
+            padding: 14px 18px;
+            margin-bottom: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: var(--text-dark);
+        }
+
+        .delete-btn {
+            background: var(--delete-bg);
+            border: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 30px;
+            font-weight: bold;
+            cursor: pointer;
+            color: var(--delete-color);
+        }
+
+        .add-action-btn {
+            background: var(--primary-dark);
+            border: none;
+            padding: 12px 20px;
+            border-radius: 40px;
+            color: white;
+            font-weight: bold;
+            margin: 10px 0;
+            width: 100%;
+            cursor: pointer;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 12px;
+            margin: 12px 0;
+            flex-wrap: wrap;
+        }
+        .input-group input, .input-group select {
+            flex: 1;
+            padding: 12px;
+            border-radius: 60px;
+            border: 1px solid var(--border-light);
+            background: var(--app-bg);
+            color: var(--text-dark);
+        }
+
+        /* Карта - новый стиль */
+        .map-container {
+            background: #cfece6;
+            border-radius: 28px;
+            padding: 8px;
+            margin-bottom: 16px;
+            height: 55vh;
+            min-height: 350px;
+        }
+        #tosnoMap {
+            height: 100%;
+            width: 100%;
+            border-radius: 24px;
+            z-index: 1;
+        }
+        .pharmacy-detail-panel {
+            background: var(--card-bg);
+            border-radius: 24px;
+            padding: 14px;
+            margin-top: 12px;
+            color: var(--text-dark);
+        }
+        .meds-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 10px 0;
+        }
+        .order-med-btn {
+            background: var(--primary-dark);
+            border: none;
+            padding: 6px 12px;
+            border-radius: 30px;
+            color: white;
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
+
+        .hidden { display: none; }
+        .inline-badge {
+            font-size: 0.75rem;
+            background: #b9dfd6;
+            padding: 2px 8px;
+            border-radius: 20px;
+        }
+        hr { margin: 12px 0; border-color: var(--border-light); }
+        
+        /* Стиль для маркеров */
+        .custom-pharmacy-marker {
+            background: transparent;
+        }
+    </style>
+</head>
+<body>
+<div class="app-container" id="appRoot">
+    <div class="top-bar" id="topBar">
+        <button class="back-btn" id="backButton">←</button>
+        <div class="page-title" id="pageTitle">МедПомощник</div>
+        <button class="settings-btn" id="settingsButton">⚙️</button>
+    </div>
+
+    <!-- ГЛАВНАЯ СТРАНИЦА -->
+    <div id="mainPage" class="page active-page">
+        <div class="page-content">
+            <div class="menu-grid">
+                <button class="menu-btn" id="medicinesBtn">💊 Лекарства</button>
+                <button class="menu-btn" id="recipesBtn">📄 Рецепты</button>
+                <button class="menu-btn" id="remindersBtn">⏰ Напоминания</button>
+                <button class="menu-btn" id="mapBtn">🗺️ Карта аптек</button>
+                <button class="menu-btn" id="illnessesBtn">📋 Мои болезни</button>
+                <button class="menu-btn" id="healthStatsBtn">❤️ Показатель здоровья</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- СТРАНИЦА ЛЕКАРСТВ (заметки) -->
+    <div id="medicinesPage" class="page"><div class="page-content"><div style="text-align:right"><button class="add-action-btn" id="openAddMedicineBtn" style="width:auto; padding:10px 20px">+ Добавить</button></div><div id="medicinesList"></div><div id="addMedicineForm" class="hidden"><div class="input-group"><input type="text" id="medicineTextInput" placeholder="Название лекарства..."><button class="add-action-btn" id="saveMedicineBtn" style="width:auto">Сохранить</button></div></div><div id="noMedicinesMsg" style="text-align:center; padding:20px;">Нет заметок</div></div></div>
+
+    <!-- РЕЦЕПТЫ (фото) -->
+    <div id="recipesPage" class="page"><div class="page-content"><div class="map-placeholder" style="background:transparent; padding:0"><button class="add-action-btn" id="takePhotoBtn">📸 Сделать фото рецепта</button><div id="recipePhotoPreview" style="margin-top:16px;"></div></div></div></div>
+
+    <!-- НАПОМИНАНИЯ (с названием лекарства) -->
+    <div id="remindersPage" class="page"><div class="page-content"><button class="add-action-btn" id="addReminderBtn">➕ Добавить напоминание</button><div id="remindersList"></div><div id="noRemindersMsg" style="text-align:center; padding:20px;">Нет напоминаний</div></div></div>
+
+    <!-- КАРТА АПТЕК - теперь карта с точками в городе Тосно -->
+    <div id="mapPage" class="page">
+        <div class="page-content">
+            <div class="map-container">
+                <div id="tosnoMap"></div>
+            </div>
+            <div id="pharmacyDetailPanel" class="pharmacy-detail-panel hidden">
+                <div id="detailName"></div>
+                <div id="detailAddress"></div>
+                <div id="detailSchedule"></div>
+                <div id="detailDelivery"></div>
+                <div id="detailMeds" class="meds-buttons"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- МОИ БОЛЕЗНИ (история + медкарта) -->
+    <div id="illnessesPage" class="page"><div class="page-content"><button class="add-action-btn" id="addHistoryBtn">📜 Добавить историю болезни</button><div id="historyList"></div><button class="add-action-btn" id="addMedCardBtn" style="margin-top:10px">🪪 Добавить медкарту</button><div id="medCardList"></div></div></div>
+
+    <!-- ПОКАЗАТЕЛЬ ЗДОРОВЬЯ (давление, температура, сахар) -->
+    <div id="healthPage" class="page"><div class="page-content"><button class="add-action-btn" id="addPressureBtn">❤️ Добавить давление</button><button class="add-action-btn" id="addTempBtn">🌡️ Добавить температуру</button><button class="add-action-btn" id="addSugarBtn">🍬 Добавить сахар в крови</button><hr><div id="pressureList"></div><div id="tempList"></div><div id="sugarList"></div></div></div>
+
+    <!-- СТРАНИЦА НАСТРОЕК (тема) -->
+    <div id="settingsPage" class="page"><div class="page-content"><h3 style="color:var(--primary-dark)">Тема приложения</h3><button class="add-action-btn" id="lightThemeBtn">☀️ Светлая (зелёная)</button><button class="add-action-btn" id="darkThemeBtn">🌙 Тёмная</button></div></div>
+</div>
+
+<script>
+    // ---------- Хранилище ----------
+    let medicines = [];
+    let recipePhotoBase64 = null;
+    let reminders = []; // {id, timeISO, timeString, medicineName}
+    let histories = []; // история болезни (текст)
+    let medCards = [];   // медкарты (текст)
+    let healthData = { pressures: [], temps: [], sugars: [] };
+    
+    // Аптеки города Тосно (Ленинградская область) с реальными координатами
+    const pharmacies = [
+        { id: 1, name: "Аптека №1 (Центральная)", address: "пр. Ленина, 25, Тосно", coords: [59.5402, 30.8785], schedule: "08:00-21:00", medicines: ["Парацетамол", "Нурофен", "Аспирин", "Корвалол"], delivery: true },
+        { id: 2, name: "Фармация Тосно", address: "ул. Советская, 12, Тосно", coords: [59.5419, 30.8742], schedule: "09:00-20:00", medicines: ["Лоратадин", "Аквамарис", "Валидол"], delivery: false },
+        { id: 3, name: "Здоровье плюс", address: "ул. Боярова, 8, Тосно", coords: [59.5385, 30.8814], schedule: "круглосуточно", medicines: ["Амоксициллин", "Но-шпа", "Мезим", "Супрастин"], delivery: true },
+        { id: 4, name: "Аптека №3", address: "шоссе Барыбина, 3, Тосно", coords: [59.5441, 30.8832], schedule: "08:30-22:00", medicines: ["Цитрамон", "Анальгин", "Дротаверин"], delivery: true },
+        { id: 5, name: "Доктор Столетов", address: "ул. Победы, 17, Тосно", coords: [59.5378, 30.8725], schedule: "09:00-21:00", medicines: ["Ренни", "Аллохол", "Витамин С"], delivery: false }
+    ];
+
+    let activeTimeouts = [];
+
+    // DOM элементы
+    const pages = ['mainPage','medicinesPage','recipesPage','remindersPage','mapPage','illnessesPage','healthPage','settingsPage'];
+    const backBtn = document.getElementById('backButton');
+    const settingsBtn = document.getElementById('settingsButton');
+    const pageTitleSpan = document.getElementById('pageTitle');
+    
+    // Переменные для карты
+    let mapInstance = null;
+    let markers = [];
+
+    // ---------- ИНИЦИАЛИЗАЦИЯ КАРТЫ ТОСНО ----------
+    function initTosnoMap() {
+        const container = document.getElementById('tosnoMap');
+        if (!container) return;
+        if (mapInstance) {
+            mapInstance.remove();
+            mapInstance = null;
+        }
+        // Центр города Тосно
+        mapInstance = L.map('tosnoMap').setView([59.5407, 30.8777], 14);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; CartoDB',
+            subdomains: 'abcd',
+            maxZoom: 18
+        }).addTo(mapInstance);
+
+        // Добавляем маркеры для каждой аптеки
+        pharmacies.forEach(pharmacy => {
+            // Кастомная зелёная иконка
+            const customIcon = L.divIcon({
+                html: `<div style="background-color: #2c7a6e; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.2);"><span style="color:white; font-size: 16px;">💊</span></div>`,
+                iconSize: [32, 32],
+                className: 'custom-pharmacy-marker'
+            });
+            const marker = L.marker(pharmacy.coords, { icon: customIcon }).addTo(mapInstance);
+            
+            // Всплывающее окно с информацией
+            marker.bindPopup(`
+                <div style="min-width: 180px;">
+                    <strong style="color:#2c7a6e;">${pharmacy.name}</strong><br>
+                    📍 ${pharmacy.address}<br>
+                    🕒 ${pharmacy.schedule}<br>
+                    <button id="popupSelectBtn_${pharmacy.id}" style="background:#2c7a6e; border:none; color:white; border-radius:20px; padding:6px 14px; margin-top:8px; cursor:pointer;">Подробнее</button>
+                </div>
+            `);
+            
+            marker.on('popupopen', () => {
+                setTimeout(() => {
+                    const btn = document.getElementById(`popupSelectBtn_${pharmacy.id}`);
+                    if (btn) {
+                        btn.onclick = (e) => {
+                            e.stopPropagation();
+                            showPharmacyDetails(pharmacy);
+                            mapInstance.closePopup();
+                        };
+                    }
+                }, 50);
+            });
+            markers.push(marker);
+        });
+    }
+
+    // Показать детали аптеки (наличие лекарств, заказ)
+    function showPharmacyDetails(pharmacy) {
+        const panel = document.getElementById('pharmacyDetailPanel');
+        const nameDiv = document.getElementById('detailName');
+        const addressDiv = document.getElementById('detailAddress');
+        const scheduleDiv = document.getElementById('detailSchedule');
+        const deliveryDiv = document.getElementById('detailDelivery');
+        const medsDiv = document.getElementById('detailMeds');
+        
+        nameDiv.innerHTML = `<strong>🏥 ${pharmacy.name}</strong>`;
+        addressDiv.innerHTML = `📍 ${pharmacy.address}`;
+        scheduleDiv.innerHTML = `🕒 ${pharmacy.schedule}`;
+        deliveryDiv.innerHTML = `🚚 ${pharmacy.delivery ? 'Доставка доступна' : 'Самовывоз'}`;
+        medsDiv.innerHTML = '<div style="width:100%; margin-bottom:8px;"><strong>💊 Лекарства в наличии:</strong></div>';
+        
+        pharmacy.medicines.forEach(med => {
+            const medBtn = document.createElement('button');
+            medBtn.className = 'order-med-btn';
+            medBtn.innerText = med;
+            medBtn.onclick = () => {
+                alert(`✅ Вы выбрали "${med}" в аптеке "${pharmacy.name}".\n${pharmacy.delivery ? 'Доставка будет оформлена.' : 'Заказ готов к самовывозу.'}\nС вами свяжется оператор.`);
+            };
+            medsDiv.appendChild(medBtn);
+        });
+        
+        const orderAnyBtn = document.createElement('button');
+        orderAnyBtn.className = 'order-med-btn';
+        orderAnyBtn.innerText = '📦 Заказать другие лекарства';
+        orderAnyBtn.style.backgroundColor = '#4bb8a6';
+        orderAnyBtn.onclick = () => {
+            alert(`Заявка на заказ в "${pharmacy.name}" принята! Вам перезвонят для уточнения наличия и доставки.`);
+        };
+        medsDiv.appendChild(orderAnyBtn);
+        
+        panel.classList.remove('hidden');
+        panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    // Загрузка
+    function loadAll() {
+        try{
+            medicines = JSON.parse(localStorage.getItem('medicines')||'[]');
+            recipePhotoBase64 = localStorage.getItem('recipePhoto');
+            reminders = JSON.parse(localStorage.getItem('remindersV2')||'[]');
+            histories = JSON.parse(localStorage.getItem('histories')||'[]');
+            medCards = JSON.parse(localStorage.getItem('medCards')||'[]');
+            const hp = localStorage.getItem('healthData');
+            if(hp) healthData = JSON.parse(hp);
+            else healthData = { pressures:[], temps:[], sugars:[] };
+            if(!healthData.pressures) healthData.pressures=[];
+            if(!healthData.temps) healthData.temps=[];
+            if(!healthData.sugars) healthData.sugars=[];
+        }catch(e){}
+    }
+    function saveMedicines(){ localStorage.setItem('medicines',JSON.stringify(medicines)); }
+    function saveRecipe(){ if(recipePhotoBase64) localStorage.setItem('recipePhoto',recipePhotoBase64); else localStorage.removeItem('recipePhoto'); }
+    function saveReminders(){ localStorage.setItem('remindersV2',JSON.stringify(reminders)); }
+    function saveHistories(){ localStorage.setItem('histories',JSON.stringify(histories)); }
+    function saveMedCards(){ localStorage.setItem('medCards',JSON.stringify(medCards)); }
+    function saveHealth(){ localStorage.setItem('healthData',JSON.stringify(healthData)); }
+
+    // отрисовка
+    function renderMedicines(){
+        const container = document.getElementById('medicinesList');
+        const noMsg = document.getElementById('noMedicinesMsg');
+        container.innerHTML='';
+        if(!medicines.length){ noMsg.style.display='block'; return; }
+        noMsg.style.display='none';
+        medicines.forEach((txt,i)=>{
+            const div = document.createElement('div'); div.className='card-item';
+            div.innerHTML=`<span>💊 ${escapeHtml(txt)}</span><button class="delete-btn" data-index="${i}">🗑</button>`;
+            container.appendChild(div);
+        });
+        document.querySelectorAll('#medicinesList .delete-btn').forEach(btn=>{
+            btn.onclick=(e)=>{
+                const idx = parseInt(btn.dataset.index);
+                medicines.splice(idx,1); saveMedicines(); renderMedicines();
+            };
+        });
+    }
+
+    function renderRecipePhoto(){
+        const preview = document.getElementById('recipePhotoPreview');
+        if(recipePhotoBase64) preview.innerHTML=`<img src="${recipePhotoBase64}" style="max-width:100%; border-radius:28px; border:2px solid var(--primary-dark);">`;
+        else preview.innerHTML='<div class="inline-badge">Нет фото рецепта</div>';
+    }
+
+    function clearTimeouts(){ activeTimeouts.forEach(t=>clearTimeout(t)); activeTimeouts=[]; }
+    function scheduleReminder(rem){
+        const delay = new Date(rem.timeISO).getTime() - Date.now();
+        if(delay<=0) return;
+        const tid = setTimeout(()=>{
+            if(Notification.permission==='granted') new Notification("МедПомощник",{body:`Примите ${rem.medicineName || 'лекарство'} в ${rem.timeString}`});
+            else alert(`🔔 НАПОМИНАНИЕ: ${rem.medicineName || 'лекарство'} в ${rem.timeString}`);
+            const idx = reminders.findIndex(r=>r.id===rem.id);
+            if(idx!==-1){ reminders.splice(idx,1); saveReminders(); renderReminders(); }
+        }, delay);
+        activeTimeouts.push(tid);
+    }
+    function renderReminders(){
+        const container = document.getElementById('remindersList');
+        const noMsg = document.getElementById('noRemindersMsg');
+        container.innerHTML='';
+        if(!reminders.length){ noMsg.style.display='block'; return; }
+        noMsg.style.display='none';
+        reminders.forEach(r=>{
+            const div = document.createElement('div'); div.className='card-item';
+            div.innerHTML=`<div><strong>💊 ${escapeHtml(r.medicineName||'Лекарство')}</strong><br/>⏰ ${r.timeString}</div><button class="delete-btn" data-id="${r.id}">✖</button>`;
+            container.appendChild(div);
+        });
+        document.querySelectorAll('#remindersList .delete-btn').forEach(btn=>{
+            btn.onclick=()=>{
+                const id = parseInt(btn.dataset.id);
+                reminders = reminders.filter(r=>r.id!==id);
+                saveReminders(); renderReminders();
+            };
+        });
+        clearTimeouts();
+        reminders.forEach(r=>scheduleReminder(r));
+    }
+
+    function renderIllnesses(){
+        const historyDiv = document.getElementById('historyList');
+        const medCardDiv = document.getElementById('medCardList');
+        historyDiv.innerHTML = '<strong>📜 История болезней:</strong>'; 
+        if(histories.length===0) historyDiv.innerHTML+='<div>Нет записей</div>';
+        else histories.forEach((h,i)=>{ historyDiv.innerHTML+=`<div class="card-item">${escapeHtml(h)}<button class="delete-btn" data-hist="${i}">🗑</button></div>`; });
+        medCardDiv.innerHTML = '<strong>🪪 Медицинские карты:</strong>';
+        if(medCards.length===0) medCardDiv.innerHTML+='<div>Нет карт</div>';
+        else medCards.forEach((c,i)=>{ medCardDiv.innerHTML+=`<div class="card-item">📄 ${escapeHtml(c)}<button class="delete-btn" data-card="${i}">🗑</button></div>`; });
+        document.querySelectorAll('[data-hist]').forEach(b=>{ b.onclick=()=>{ histories.splice(parseInt(b.dataset.hist),1); saveHistories(); renderIllnesses(); }; });
+        document.querySelectorAll('[data-card]').forEach(b=>{ b.onclick=()=>{ medCards.splice(parseInt(b.dataset.card),1); saveMedCards(); renderIllnesses(); }; });
+    }
+
+    function renderHealthStats(){
+        const pressureDiv = document.getElementById('pressureList');
+        const tempDiv = document.getElementById('tempList');
+        const sugarDiv = document.getElementById('sugarList');
+        pressureDiv.innerHTML = '<strong>❤️ Давление:</strong>';
+        healthData.pressures.forEach((p,i)=>{ pressureDiv.innerHTML+=`<div class="card-item">${escapeHtml(p)}<button class="delete-btn" data-press="${i}">🗑</button></div>`; });
+        tempDiv.innerHTML = '<strong>🌡️ Температура:</strong>';
+        healthData.temps.forEach((t,i)=>{ tempDiv.innerHTML+=`<div class="card-item">${escapeHtml(t)}<button class="delete-btn" data-temp="${i}">🗑</button></div>`; });
+        sugarDiv.innerHTML = '<strong>🍬 Сахар крови:</strong>';
+        healthData.sugars.forEach((s,i)=>{ sugarDiv.innerHTML+=`<div class="card-item">${escapeHtml(s)}<button class="delete-btn" data-sugar="${i}">🗑</button></div>`; });
+        document.querySelectorAll('[data-press]').forEach(b=>{ b.onclick=()=>{ healthData.pressures.splice(parseInt(b.dataset.press),1); saveHealth(); renderHealthStats(); }; });
+        document.querySelectorAll('[data-temp]').forEach(b=>{ b.onclick=()=>{ healthData.temps.splice(parseInt(b.dataset.temp),1); saveHealth(); renderHealthStats(); }; });
+        document.querySelectorAll('[data-sugar]').forEach(b=>{ b.onclick=()=>{ healthData.sugars.splice(parseInt(b.dataset.sugar),1); saveHealth(); renderHealthStats(); }; });
+    }
+
+    // Навигация
+    function showPage(pageId, title){
+        pages.forEach(p=>{ document.getElementById(p).classList.remove('active-page'); document.getElementById(p).style.display='none'; });
+        const activePg = document.getElementById(pageId);
+        activePg.style.display='flex';
+        activePg.classList.add('active-page');
+        pageTitleSpan.innerText = title;
+        if(pageId === 'mainPage') backBtn.style.opacity = '0'; else backBtn.style.opacity = '1';
+        if(pageId === 'medicinesPage') renderMedicines();
+        if(pageId === 'recipesPage') renderRecipePhoto();
+        if(pageId === 'remindersPage') renderReminders();
+        if(pageId === 'mapPage') { 
+            setTimeout(() => { 
+                if(!mapInstance) initTosnoMap(); 
+                else mapInstance.invalidateSize();
+                document.getElementById('pharmacyDetailPanel').classList.add('hidden');
+            }, 100);
+        }
+        if(pageId === 'illnessesPage') renderIllnesses();
+        if(pageId === 'healthPage') renderHealthStats();
+        if(pageId === 'settingsPage') {}
+    }
+
+    // Добавление напоминания с названием лекарства
+    function addReminderWithMedicine(){
+        const modal = document.createElement('div'); modal.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:2000';
+        const panel = document.createElement('div'); panel.style.cssText='background:var(--app-bg);padding:24px;border-radius:40px;width:280px;';
+        panel.innerHTML=`<h3>💊 Напоминание</h3><input type="text" id="remMedName" placeholder="Название лекарства" style="width:100%; margin:10px 0; padding:10px; border-radius:40px;"><input type="datetime-local" id="remDateTime" style="width:100%; margin:10px 0; padding:10px;"><div style="display:flex; gap:10px;"><button id="remConfirm">Установить</button><button id="remCancel">Отмена</button></div>`;
+        modal.appendChild(panel); document.body.appendChild(modal);
+        const now = new Date(); now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        document.getElementById('remDateTime').min = now.toISOString().slice(0,16);
+        document.getElementById('remConfirm').onclick=()=>{
+            const medName = document.getElementById('remMedName').value.trim();
+            if(!medName){ alert("Введите название лекарства"); return; }
+            const dt = document.getElementById('remDateTime').value;
+            if(!dt){ alert("Выберите время"); return; }
+            const target = new Date(dt);
+            if(target<=new Date()){ alert("Будущее время"); return; }
+            const newRem = { id:Date.now(), timeISO:target.toISOString(), timeString:target.toLocaleString(), medicineName:medName };
+            reminders.push(newRem); saveReminders(); renderReminders();
+            document.body.removeChild(modal);
+        };
+        document.getElementById('remCancel').onclick=()=>document.body.removeChild(modal);
+    }
+
+    function initEventListeners(){
+        document.getElementById('medicinesBtn').onclick=()=>showPage('medicinesPage','💊 Лекарства');
+        document.getElementById('recipesBtn').onclick=()=>showPage('recipesPage','📄 Рецепты');
+        document.getElementById('remindersBtn').onclick=()=>showPage('remindersPage','⏰ Напоминания');
+        document.getElementById('mapBtn').onclick=()=>showPage('mapPage','🗺️ Аптеки Тосно');
+        document.getElementById('illnessesBtn').onclick=()=>showPage('illnessesPage','📋 Мои болезни');
+        document.getElementById('healthStatsBtn').onclick=()=>showPage('healthPage','❤️ Показатели здоровья');
+        settingsBtn.onclick=()=>showPage('settingsPage','⚙️ Настройки');
+        backBtn.onclick=()=>{ showPage('mainPage','МедПомощник'); };
+        
+        // Лекарства
+        document.getElementById('openAddMedicineBtn').onclick=()=>{ document.getElementById('addMedicineForm').classList.toggle('hidden'); };
+        document.getElementById('saveMedicineBtn').onclick=()=>{ let val=document.getElementById('medicineTextInput').value.trim(); if(val){ medicines.push(val); saveMedicines(); renderMedicines(); document.getElementById('medicineTextInput').value=''; document.getElementById('addMedicineForm').classList.add('hidden'); } };
+        // Рецепты фото
+        document.getElementById('takePhotoBtn').onclick=()=>{ const input=document.createElement('input'); input.type='file'; input.accept='image/*'; input.capture='environment'; input.onchange=e=>{ if(e.target.files[0]){ const fr=new FileReader(); fr.onload=ev=>{ recipePhotoBase64=ev.target.result; saveRecipe(); renderRecipePhoto(); }; fr.readAsDataURL(e.target.files[0]); } }; input.click(); };
+        // Напоминания
+        document.getElementById('addReminderBtn').onclick=()=>{ if(Notification.permission==='default') Notification.requestPermission(); addReminderWithMedicine(); };
+        // История болезней
+        document.getElementById('addHistoryBtn').onclick=()=>{ let txt=prompt("Введите запись истории болезни:"); if(txt && txt.trim()){ histories.push(txt.trim()); saveHistories(); renderIllnesses(); } };
+        document.getElementById('addMedCardBtn').onclick=()=>{ let txt=prompt("Введите данные медкарты (серия, номер, диагноз и т.д.):"); if(txt && txt.trim()){ medCards.push(txt.trim()); saveMedCards(); renderIllnesses(); } };
+        // Показатели здоровья
+        document.getElementById('addPressureBtn').onclick=()=>{ let v=prompt("Введите давление (например 120/80):"); if(v) { healthData.pressures.push(v); saveHealth(); renderHealthStats(); } };
+        document.getElementById('addTempBtn').onclick=()=>{ let v=prompt("Введите температуру (36.6):"); if(v) { healthData.temps.push(v); saveHealth(); renderHealthStats(); } };
+        document.getElementById('addSugarBtn').onclick=()=>{ let v=prompt("Введите уровень сахара (5.5):"); if(v) { healthData.sugars.push(v); saveHealth(); renderHealthStats(); } };
+        // Настройки темы
+        document.getElementById('lightThemeBtn').onclick=()=>{ document.body.classList.remove('dark'); localStorage.setItem('theme','light'); };
+        document.getElementById('darkThemeBtn').onclick=()=>{ document.body.classList.add('dark'); localStorage.setItem('theme','dark'); };
+    }
+
+    function applyTheme(){ if(localStorage.getItem('theme')==='dark') document.body.classList.add('dark'); else document.body.classList.remove('dark'); }
+
+    function escapeHtml(str){ return str.replace(/[&<>]/g, m=> m==='&'?'&amp;': m==='<'?'&lt;':'&gt;'); }
+
+    loadAll(); applyTheme(); initEventListeners(); 
+    showPage('mainPage','МедПомощник');
+    // инициализируем отображение для страниц, которые могут быть показаны
+    renderMedicines(); renderRecipePhoto(); renderReminders(); renderIllnesses(); renderHealthStats();
+    // скрыть кнопку назад на главной визуально
+    if(document.getElementById('mainPage').classList.contains('active-page')) backBtn.style.opacity='0';
+</script>
+</body>
+</html>
